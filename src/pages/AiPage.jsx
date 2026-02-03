@@ -286,6 +286,8 @@ const AiPage = () => {
                         <div className="w-1 h-1 rounded-full bg-red-600"></div>
                         Neural weights stable
                         <div className="w-1 h-1 rounded-full bg-red-600"></div>
+                        Direct Link: {import.meta.env.VITE_API_URL || 'Local Mode'}
+                        <div className="w-1 h-1 rounded-full bg-red-600"></div>
                         Zero knowledge protocol active
                     </div>
                 </div>
