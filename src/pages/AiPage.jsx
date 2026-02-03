@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   PanelLeft, 
   SquarePen, 
@@ -17,6 +17,49 @@ import {
 const AiPage = () => {
     const [query, setQuery] = useState('');
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [messages, setMessages] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const messagesEndRef = useRef(null);
+
+    // Auto-scroll to bottom when messages change
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages, isLoading]);
+
+    const handleSendMessage = async (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        if (!query.trim() || isLoading) return;
+
+        const userMessage = { role: 'user', content: query };
+        setMessages(prev => [...prev, userMessage]);
+        setQuery('');
+        setIsLoading(true);
+
+        try {
+            const response = await fetch('http://127.0.0.1:5000/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: query })
+            });
+            const data = await response.json();
+            
+            setMessages(prev => [...prev, { 
+                role: 'assistant', 
+                content: data.reply,
+                status: data.status,
+                latency: data.latency
+            }]);
+        } catch (error) {
+            console.error('Failed to link with core:', error);
+            setMessages(prev => [...prev, { 
+                role: 'assistant', 
+                content: 'CRITICAL ERROR: Neural link severed. Please retry protocol initiation.',
+                isError: true
+            }]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
   return (
     <div className="flex h-screen bg-[#030303] text-white font-sans overflow-hidden selection:bg-red-900/30 selection:text-red-200">
@@ -125,30 +168,80 @@ const AiPage = () => {
             </header>
 
             {/* Chat View */}
-            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-                
-                {/* Visual Centerpiece */}
-                <div className="mb-12 relative animate-fade-in-down">
-                    <div className="absolute -inset-10 bg-red-600/10 blur-[60px] rounded-full opacity-50"></div>
-                    <h1 className="text-4xl md:text-5xl font-black tracking-tighter mb-4 leading-tight">
-                        WAKE UP <br />
-                        <span className="text-transparent bg-clip-text bg-gradient-to-b from-red-500 to-red-700 drop-shadow-[0_0_20px_rgba(220,38,38,0.3)]">
-                            THE MACHINE.
-                        </span>
-                    </h1>
-                    <p className="text-zinc-500 text-sm tracking-[0.1em] font-medium uppercase max-w-sm mx-auto">
-                        Initiate direct neural link with the singularity core
-                    </p>
-                </div>
+            <div className="flex-1 flex flex-col overflow-y-auto px-6 py-4 scrollbar-thin scrollbar-thumb-red-900/20">
+                {messages.length === 0 ? (
+                    /* Visual Centerpiece (Hidden when chat starts) */
+                    <div className="flex-1 flex flex-col items-center justify-center text-center animate-fade-in-down">
+                        <div className="mb-12 relative">
+                            <div className="absolute -inset-10 bg-red-600/10 blur-[60px] rounded-full opacity-50"></div>
+                            <h1 className="text-4xl md:text-5xl font-black tracking-tighter mb-4 leading-tight">
+                                WAKE UP <br />
+                                <span className="text-transparent bg-clip-text bg-gradient-to-b from-red-500 to-red-700 drop-shadow-[0_0_20px_rgba(220,38,38,0.3)]">
+                                    THE MACHINE.
+                                </span>
+                            </h1>
+                            <p className="text-zinc-500 text-sm tracking-[0.1em] font-medium uppercase max-w-sm mx-auto">
+                                Initiate direct neural link with the singularity core
+                            </p>
+                        </div>
+                    </div>
+                ) : (
+                    /* Chat Messages */
+                    <div className="max-w-3xl w-full mx-auto space-y-8 py-8">
+                        {messages.map((msg, idx) => (
+                            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
+                                <div className={`max-w-[85%] group relative ${msg.role === 'user' ? 'order-1' : 'order-2'}`}>
+                                    <div className={`p-5 rounded-3xl ${
+                                        msg.role === 'user' 
+                                            ? 'bg-red-600/10 border border-red-600/20 text-zinc-100 shadow-[0_0_30px_rgba(220,38,38,0.05)]' 
+                                            : 'bg-white/5 border border-white/5 text-zinc-300'
+                                    }`}>
+                                        <div className="text-sm leading-relaxed tracking-wide font-medium">
+                                            {msg.content}
+                                        </div>
+                                        {msg.role === 'assistant' && (
+                                            <div className="mt-3 flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <div className="text-[9px] font-bold tracking-widest text-zinc-600 uppercase">
+                                                    STATUS: {msg.status || 'STABLE'}
+                                                </div>
+                                                <div className="w-1 h-1 rounded-full bg-zinc-800"></div>
+                                                <div className="text-[9px] font-bold tracking-widest text-zinc-600 uppercase">
+                                                    DELAY: {msg.latency || '0ms'}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className={`mt-2 text-[9px] font-black tracking-[0.2em] uppercase text-zinc-700 ${msg.role === 'user' ? 'text-right mr-4' : 'text-left ml-4'}`}>
+                                        {msg.role === 'user' ? 'AUTHORIZED USER' : 'CORE SINGULARITY'}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        {isLoading && (
+                            <div className="flex justify-start animate-pulse">
+                                <div className="bg-white/5 border border-white/5 p-4 rounded-3xl">
+                                    <div className="flex gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-red-600 animate-bounce"></div>
+                                        <div className="w-1.5 h-1.5 rounded-full bg-red-600 animate-bounce [animation-delay:-0.15s]"></div>
+                                        <div className="w-1.5 h-1.5 rounded-full bg-red-600 animate-bounce [animation-delay:-0.3s]"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {/* Invisible element to scroll to */}
+                        <div ref={messagesEndRef} />
+                    </div>
+                )}
+            </div>
 
-                {/* Styled Input Pill */}
-                <div className="w-full max-w-3xl relative animate-fade-in-up">
+            {/* Styled Input Pill */}
+            <div className="px-6 pb-8 pt-2 bg-gradient-to-t from-[#030303] via-[#030303] to-transparent">
+                <div className="w-full max-w-3xl mx-auto relative">
                     <div className="absolute -inset-2 bg-gradient-to-r from-red-600/20 to-transparent blur-xl opacity-0 group-focus-within:opacity-100 transition-opacity"></div>
                     
-                    <div className="relative bg-[#0a0a0a]/80 backdrop-blur-2xl border border-white/5 focus-within:border-red-600/40 rounded-[2.5rem] shadow-2xl transition-all p-2 group">
-                        
-                        <div className="flex items-center px-4 py-2">
-                            <button className="p-2.5 text-zinc-500 hover:text-red-500 hover:bg-red-500/5 rounded-full transition-all">
+                    <form onSubmit={handleSendMessage} className="relative bg-[#0a0a0a]/80 backdrop-blur-2xl border border-white/5 focus-within:border-red-600/40 rounded-[2.5rem] shadow-2xl transition-all p-2 group">
+                        <div className="flex items-center px-4 py-1">
+                            <button type="button" className="p-2.5 text-zinc-500 hover:text-red-500 hover:bg-red-500/5 rounded-full transition-all">
                                 <Plus className="w-5 h-5 transition-transform group-hover:rotate-90" />
                             </button>
                             <input 
@@ -158,33 +251,43 @@ const AiPage = () => {
                                 placeholder="Ask the Singularity..." 
                                 className="flex-1 bg-transparent border-none text-white text-base px-3 py-4 focus:outline-none placeholder:text-zinc-700 font-medium tracking-wide"
                             />
+                             <button 
+                                type="submit"
+                                disabled={isLoading || !query.trim()}
+                                className={`p-3 rounded-full transition-all shadow-[0_0_20px_rgba(220,38,38,0.4)] group-hover:scale-105 active:scale-95 ${
+                                    isLoading || !query.trim() ? 'bg-zinc-800 text-zinc-600 animate-pulse' : 'bg-red-600 hover:bg-red-500 text-white'
+                                }`}
+                             >
+                                <Sparkles className="w-5 h-5" />
+                            </button>
                         </div>
 
                          <div className="flex items-center justify-between px-6 pb-2 pt-0">
                              <div className="flex items-center gap-4">
                                  <div className="h-px w-8 bg-zinc-800"></div>
-                                 <div className="text-[10px] font-bold tracking-widest text-zinc-700 uppercase">Input Terminal</div>
+                                 <div className="text-[10px] font-bold tracking-widest text-zinc-700 uppercase">
+                                    {isLoading ? 'Neural Stream Processing...' : 'Input Terminal Ready'}
+                                 </div>
                              </div>
                              <div className="flex items-center gap-2">
-                                <button className="p-3 text-zinc-500 hover:text-white transition-colors">
+                                <button type="button" className="p-3 text-zinc-500 hover:text-white transition-colors">
                                     <Mic className="w-5 h-5" />
                                 </button>
-                                <button className="p-3 bg-red-600 hover:bg-red-500 text-white rounded-full transition-all shadow-[0_0_20px_rgba(220,38,38,0.4)] group-hover:scale-105 active:scale-95">
+                                <button type="button" className="p-3 text-zinc-500 hover:text-white transition-colors">
                                      <Headphones className="w-5 h-5" />
                                 </button>
                              </div>
                          </div>
-                    </div>
+                    </form>
                     
                     {/* Console-style Warning */}
-                    <div className="mt-8 flex items-center justify-center gap-2 opacity-30 text-[9px] font-bold tracking-[0.2em] text-zinc-500 uppercase">
+                    <div className="mt-4 flex items-center justify-center gap-2 opacity-30 text-[9px] font-bold tracking-[0.2em] text-zinc-500 uppercase">
                         <div className="w-1 h-1 rounded-full bg-red-600"></div>
                         Neural weights stable
                         <div className="w-1 h-1 rounded-full bg-red-600"></div>
                         Zero knowledge protocol active
                     </div>
                 </div>
-
             </div>
       </div>
 
