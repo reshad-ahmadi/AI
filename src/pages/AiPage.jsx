@@ -84,7 +84,7 @@ const AiPage = () => {
                         <div className="w-8 h-8 rounded-lg bg-red-600/10 border border-red-600/20 flex items-center justify-center">
                             <Grip className="w-5 h-5 text-red-600" />
                         </div>
-                        <span className="text-sm font-black tracking-[0.25em] h-fit uppercase text-white">CipherX</span>
+                        <span className="text-sm font-black tracking-[0.25em] h-fit  text-white">cipherx</span>
                     </div>
                     <button 
                         onClick={() => setIsSidebarOpen(false)} 
